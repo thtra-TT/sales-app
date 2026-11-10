@@ -45,7 +45,11 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
   Future<List<SalesLedgerEntry>> _load() =>
       ref.read(managerRepositoryProvider).fetchLedger(_range);
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Future<void> _pick() async {
     final now = DateTime.now();

@@ -5,6 +5,7 @@ class ProductItem {
   final String productId;
   final String name;
   final double price;
+  final String? imageUrl;
   final bool isActive;
 
   const ProductItem({
@@ -12,6 +13,7 @@ class ProductItem {
     required this.productId,
     required this.name,
     required this.price,
+    this.imageUrl,
     this.isActive = true,
   });
 
@@ -20,6 +22,7 @@ class ProductItem {
         productId: j['product_id'] as String,
         name: j['name'] as String,
         price: toDouble(j['price']),
+        imageUrl: j['image_url'] as String?,
         isActive: j['is_active'] as bool? ?? true,
       );
 

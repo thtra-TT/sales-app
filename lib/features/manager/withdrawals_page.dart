@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme.dart';
 import '../../models/models.dart';
 import 'manager_common.dart';
 import 'manager_repository.dart';
@@ -29,7 +30,11 @@ class _WithdrawalsPageState extends ConsumerState<WithdrawalsPage> {
   Future<List<WithdrawalRequest>> _load() =>
       ref.read(managerRepositoryProvider).fetchWithdrawals(status: _filter);
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Color _color(WithdrawStatus s) => switch (s) {
         WithdrawStatus.pending => Colors.orange,
@@ -96,7 +101,14 @@ class _WithdrawalsPageState extends ConsumerState<WithdrawalsPage> {
                             );
                             if (changed == true) _reload();
                           },
-                          title: Text('${w.sellerName ?? '-'} · ${money(w.amount)}'),
+                          title: Row(children: [
+                            Expanded(
+                                child: Text(w.sellerName ?? 'Người bán (chưa đặt tên)',
+                                    style: const TextStyle(fontWeight: FontWeight.w700))),
+                            Text(money(w.amount),
+                                style: const TextStyle(
+                                    color: kPriceColor, fontWeight: FontWeight.w800)),
+                          ]),
                           subtitle: Text(fmtDateTime(w.createdAt)),
                           trailing: StatusChip(w.status.label, _color(w.status)),
                         ),
@@ -229,7 +241,7 @@ class _WithdrawalDetailPageState extends ConsumerState<WithdrawalDetailPage> {
           child: Column(children: [
             ListTile(
               leading: const Icon(Icons.person_outline),
-              title: Text(_r.sellerName ?? '-'),
+              title: Text(_r.sellerName ?? 'Người bán (chưa đặt tên)'),
               subtitle: Text('Yêu cầu lúc ${fmtDateTime(_r.createdAt)}'),
             ),
             ListTile(

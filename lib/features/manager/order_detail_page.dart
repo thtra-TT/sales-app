@@ -26,8 +26,11 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     _future = ref.read(managerRepositoryProvider).fetchOrder(widget.orderId);
   }
 
-  void _reload() => setState(() =>
-      _future = ref.read(managerRepositoryProvider).fetchOrder(widget.orderId));
+  void _reload() {
+    setState(() {
+      _future = ref.read(managerRepositoryProvider).fetchOrder(widget.orderId);
+    });
+  }
 
   Future<void> _setDelivery(Order o, DeliveryStatus s) async {
     if (s == o.deliveryStatus || _busy) return;

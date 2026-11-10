@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show SupabaseClient, FileOptions;
 
 import '../../core/providers.dart';
+import '../../models/json_helpers.dart' show toDate;
 import '../../models/models.dart';
 
 final managerRepositoryProvider = Provider<ManagerRepository>(
@@ -16,7 +17,57 @@ final managerRepositoryProvider = Provider<ManagerRepository>(
 class ItemInput {
   final String name;
   final double price;
-  const ItemInput(this.name, this.price);
+  final String? imageUrl;
+  const ItemInput(this.name, this.price, [this.imageUrl]);
+}
+
+class AccountRow {
+  final String id;
+  final String? fullName;
+  final String? phone;
+  final String? email;
+  final UserRole role;
+  final bool isActive;
+  const AccountRow({
+    required this.id,
+    required this.role,
+    this.fullName,
+    this.phone,
+    this.email,
+    this.isActive = true,
+  });
+
+  factory AccountRow.fromJson(Map<String, dynamic> j) => AccountRow(
+        id: j['id'] as String,
+        fullName: j['full_name'] as String?,
+        phone: j['phone'] as String?,
+        email: j['email'] as String?,
+        role: UserRole.fromString(j['role'] as String?),
+        isActive: j['is_active'] as bool? ?? true,
+      );
+}
+
+class AuditLog {
+  final int id;
+  final String? actorName;
+  final String action; // vd: withdrawal.approve
+  final Map<String, dynamic> detail;
+  final DateTime? createdAt;
+  const AuditLog({
+    required this.id,
+    required this.action,
+    required this.detail,
+    this.actorName,
+    this.createdAt,
+  });
+
+  factory AuditLog.fromJson(Map<String, dynamic> j) => AuditLog(
+        id: j['id'] as int,
+        actorName: j['actor_name'] as String?,
+        action: j['action'] as String,
+        detail: Map<String, dynamic>.from((j['detail'] as Map?) ?? const {}),
+        createdAt: toDate(j['created_at']),
+      );
 }
 
 class ManagerRepository {
@@ -46,19 +97,26 @@ class ManagerRepository {
   Future<void> createProduct({
     required String name,
     String? description,
+    String? imageUrl,
     required List<ItemInput> items,
   }) async {
     final p = await _db
         .from('products')
-        .insert(Product.toInsertJson(name: name, description: description))
+        .insert({
+          ...Product.toInsertJson(name: name, description: description),
+          'image_url': imageUrl,
+        })
         .select()
         .single();
     final id = p['id'] as String;
     try {
       await _db.from('product_items').insert([
         for (final i in items)
-          ProductItem.toInsertJson(
-              productId: id, name: i.name, price: i.price),
+          {
+            ...ProductItem.toInsertJson(
+                productId: id, name: i.name, price: i.price),
+            'image_url': i.imageUrl,
+          },
       ]);
     } catch (_) {
       // Chưa có đơn nào dùng -> xoá hẳn để không để lại sản phẩm rỗng.
@@ -71,11 +129,17 @@ class ManagerRepository {
     required String id,
     required String name,
     String? description,
+    required String? imageUrl,
     required bool isActive,
   }) async {
     final r = await _db
         .from('products')
-        .update({'name': name, 'description': description, 'is_active': isActive})
+        .update({
+          'name': name,
+          'description': description,
+          'image_url': imageUrl,
+          'is_active': isActive,
+        })
         .eq('id', id)
         .select();
     _mustAffect(r, 'cập nhật sản phẩm');
@@ -85,11 +149,17 @@ class ManagerRepository {
     required String id,
     required String name,
     required double price,
+    required String? imageUrl,
     required bool isActive,
   }) async {
     final r = await _db
         .from('product_items')
-        .update({'name': name, 'price': price, 'is_active': isActive})
+        .update({
+          'name': name,
+          'price': price,
+          'image_url': imageUrl,
+          'is_active': isActive,
+        })
         .eq('id', id)
         .select();
     _mustAffect(r, 'cập nhật item');
@@ -99,9 +169,31 @@ class ManagerRepository {
     required String productId,
     required String name,
     required double price,
+    String? imageUrl,
   }) async {
-    await _db.from('product_items').insert(
-        ProductItem.toInsertJson(productId: productId, name: name, price: price));
+    await _db.from('product_items').insert({
+      ...ProductItem.toInsertJson(productId: productId, name: name, price: price),
+      'image_url': imageUrl,
+    });
+  }
+
+  /// Bucket `product-images` để public -> lưu thẳng URL công khai vào image_url.
+  Future<String> uploadProductImage({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final dot = fileName.lastIndexOf('.');
+    var ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase() : 'jpg';
+    if (!['jpg', 'jpeg', 'png', 'webp'].contains(ext)) ext = 'jpg';
+    final path = 'img/${DateTime.now().microsecondsSinceEpoch}.$ext';
+    await _db.storage.from('product-images').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: ext == 'jpg' ? 'image/jpeg' : 'image/$ext',
+          ),
+        );
+    return _db.storage.from('product-images').getPublicUrl(path);
   }
 
   // ---------------- UC14 / UC15: đơn hàng ----------------
@@ -259,5 +351,68 @@ class ManagerRepository {
       final r = await _db.from('member_ranks').update(body).eq('id', id).select();
       _mustAffect(r, 'cập nhật hạng (đã chạy sql/manager_migration.sql chưa?)');
     }
+  }
+
+  // ---------------- Quản lý tài khoản ----------------
+
+  Future<List<AccountRow>> fetchAccounts({UserRole? role}) async {
+    var q = _db
+        .from('profiles')
+        .select('id, full_name, phone, email, role, is_active');
+    if (role != null) q = q.eq('role', role.name);
+    final data = await q.order('created_at', ascending: false);
+    return data.map<AccountRow>(AccountRow.fromJson).toList();
+  }
+
+  /// Thao tác cần service role -> gọi Edge Function `create-user`.
+  Future<void> _callAccountFunction(Map<String, dynamic> body) async {
+    final res = await _db.functions.invoke('create-user', body: body);
+    final d = res.data;
+    if (d is Map && d['error'] != null) throw d['error'].toString();
+  }
+
+  Future<void> createAccount({
+    required String email,
+    required String password,
+    required String fullName,
+    String? phone,
+    required UserRole role,
+  }) =>
+      _callAccountFunction({
+        'action': 'create',
+        'email': email,
+        'password': password,
+        'full_name': fullName,
+        'phone': phone,
+        'role': role.name,
+      });
+
+  Future<void> setAccountActive(String id, bool active) =>
+      _callAccountFunction({'action': 'set_active', 'id': id, 'active': active});
+
+  Future<void> resetPassword(String id, String password) => _callAccountFunction(
+      {'action': 'reset_password', 'id': id, 'password': password});
+
+  Future<void> updateAccount({
+    required String id,
+    required String fullName,
+    String? phone,
+  }) async {
+    final r = await _db
+        .from('profiles')
+        .update({'full_name': fullName, 'phone': phone})
+        .eq('id', id)
+        .select();
+    _mustAffect(r, 'cập nhật tài khoản');
+  }
+
+  // ---------------- Nhật ký thao tác ----------------
+
+  /// [prefix] lọc theo nhóm hành động, vd 'withdrawal.' / 'item.' / 'rank.'
+  Future<List<AuditLog>> fetchAuditLogs({String? prefix, int limit = 100}) async {
+    var q = _db.from('audit_logs').select();
+    if (prefix != null) q = q.like('action', '$prefix%');
+    final data = await q.order('created_at', ascending: false).limit(limit);
+    return data.map<AuditLog>(AuditLog.fromJson).toList();
   }
 }

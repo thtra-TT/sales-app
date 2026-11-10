@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'ledger_page.dart';
 import 'orders_page.dart';
 import 'products_page.dart';
-import 'ranks_page.dart';
+import 'settings_page.dart';
 import 'withdrawals_page.dart';
 
 class ManagerHome extends StatefulWidget {
@@ -21,7 +21,7 @@ class _ManagerHomeState extends State<ManagerHome> {
     OrdersPage(),
     LedgerPage(),
     WithdrawalsPage(),
-    RanksPage(),
+    SettingsPage(),
   ];
 
   @override
@@ -40,7 +40,9 @@ class _ManagerHomeState extends State<ManagerHome> {
             NavigationDestination(
                 icon: Icon(Icons.payments_outlined), label: 'Rút tiền'),
             NavigationDestination(
-                icon: Icon(Icons.workspace_premium_outlined), label: 'Hạng'),
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Cài đặt'),
           ],
         ),
       );

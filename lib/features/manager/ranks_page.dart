@@ -35,7 +35,11 @@ class _RanksPageState extends ConsumerState<RanksPage> {
     return r;
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Future<void> _edit([MemberRank? rank]) async {
     final input = await showDialog<_RankInput>(
@@ -71,6 +75,7 @@ class _RanksPageState extends ConsumerState<RanksPage> {
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'fab_ranks',
           onPressed: () => _edit(),
           icon: const Icon(Icons.add),
           label: const Text('Thêm hạng'),

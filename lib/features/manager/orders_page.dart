@@ -76,7 +76,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         range: _range,
       );
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Future<void> _pickRange() async {
     final now = DateTime.now();

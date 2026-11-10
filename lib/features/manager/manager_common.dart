@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
-    show PostgrestException, StorageException;
+    show PostgrestException, StorageException, FunctionException;
 
 import '../../core/providers.dart';
 
@@ -18,6 +18,11 @@ String fmtDate(DateTime d) => _dateFmt.format(d);
 String errorText(Object e) {
   if (e is PostgrestException) return e.message;
   if (e is StorageException) return e.message;
+  if (e is FunctionException) {
+    final d = e.details;
+    if (d is Map && d['error'] != null) return d['error'].toString();
+    return d?.toString() ?? 'Lỗi máy chủ (${e.status}). Đã deploy Edge Function chưa?';
+  }
   return e.toString();
 }
 
