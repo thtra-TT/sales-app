@@ -17,6 +17,7 @@ const _groups = [
   _Group('Sản phẩm / giá', 'item.'),
   _Group('Hạng', 'rank.'),
   _Group('Giao hàng', 'order.'),
+  _Group('Sản xuất', 'production.'),
   _Group('Tài khoản', 'account.'),
 ];
 
@@ -25,6 +26,13 @@ String _pct(dynamic v) {
   final d = _n(v);
   return '${d == d.roundToDouble() ? d.toInt() : d}%';
 }
+
+String _production(dynamic v) => switch (v) {
+      'pending' => 'Chờ sản xuất',
+      'in_progress' => 'Đang sản xuất',
+      'done' => 'Hoàn thành',
+      _ => '$v',
+    };
 
 String _delivery(dynamic v) => v == 'delivered' ? 'Đã giao' : 'Chưa giao';
 String _role(dynamic v) => switch (v) {
@@ -73,6 +81,9 @@ String describe(AuditLog l) {
       return 'Sửa hạng ${n['name']}: ${parts.join(', ')}';
     case 'order.delivery':
       return 'Đơn ${d['code']}: ${_delivery(d['from'])} → ${_delivery(d['to'])}';
+    case 'production.status':
+      return 'Đơn ${d['code']} – ${d['product']} – ${d['item']} × ${d['quantity']}: '
+          '${_production(d['from'])} → ${_production(d['to'])}';
     case 'account.create':
       return 'Tạo tài khoản ${d['name']} (${_role(d['role'])}, ${d['email']})';
     case 'account.lock':
@@ -94,6 +105,9 @@ String describe(AuditLog l) {
   }
   if (action.startsWith('rank.')) return (Icons.workspace_premium_outlined, Colors.amber.shade800);
   if (action.startsWith('order.')) return (Icons.local_shipping_outlined, Colors.blue);
+  if (action.startsWith('production.')) {
+    return (Icons.precision_manufacturing_outlined, Colors.purple);
+  }
   if (action == 'account.lock') return (Icons.lock_outline, Colors.red);
   if (action == 'account.unlock') return (Icons.lock_open_outlined, Colors.green);
   if (action.startsWith('account.')) return (Icons.manage_accounts_outlined, Colors.purple);

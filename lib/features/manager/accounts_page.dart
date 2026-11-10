@@ -206,6 +206,22 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                                 if (a.email != null) Text(a.email!),
                                 if (a.phone != null && a.phone!.isNotEmpty)
                                   Text(a.phone!),
+                                if (a.role == UserRole.seller &&
+                                    a.totalCommission != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text.rich(TextSpan(children: [
+                                    const TextSpan(text: 'Hoa hồng đã nhận: '),
+                                    TextSpan(
+                                      text: money(a.totalCommission!),
+                                      style: const TextStyle(
+                                          color: kPriceColor,
+                                          fontWeight: FontWeight.w800),
+                                    ),
+                                    TextSpan(text: ' (${a.commissionOrders ?? 0} đơn)'),
+                                  ])),
+                                ],
+                                if (a.role == UserRole.seller && a.walletBalance != null)
+                                  Text('Số dư ví: ${money(a.walletBalance!)}'),
                                 const SizedBox(height: 4),
                                 Wrap(spacing: 6, children: [
                                   StatusChip(a.role.label, _roleColor(a.role)),

@@ -28,6 +28,9 @@ class AccountRow {
   final String? email;
   final UserRole role;
   final bool isActive;
+  final double? walletBalance; // số dư ví hiện tại
+  final double? totalCommission; // tổng hoa hồng đã nhận (null = chưa tải được)
+  final int? commissionOrders; // số đơn đã được tính hoa hồng
   const AccountRow({
     required this.id,
     required this.role,
@@ -35,9 +38,17 @@ class AccountRow {
     this.phone,
     this.email,
     this.isActive = true,
+    this.walletBalance,
+    this.totalCommission,
+    this.commissionOrders,
   });
 
-  factory AccountRow.fromJson(Map<String, dynamic> j) => AccountRow(
+  factory AccountRow.fromJson(Map<String, dynamic> j,
+          {double? commission, int? commissionOrders}) =>
+      AccountRow(
+        walletBalance: (j['wallet_balance'] as num?)?.toDouble(),
+        totalCommission: commission,
+        commissionOrders: commissionOrders,
         id: j['id'] as String,
         fullName: j['full_name'] as String?,
         phone: j['phone'] as String?,
@@ -70,6 +81,44 @@ class AuditLog {
       );
 }
 
+class CustomerRow {
+  final String id;
+  final String name;
+  final String? phone;
+  final String? contactChannel;
+  final String? address;
+  final String? sellerName;
+  final int orderCount;
+  final DateTime? createdAt;
+  const CustomerRow({
+    required this.id,
+    required this.name,
+    this.phone,
+    this.contactChannel,
+    this.address,
+    this.sellerName,
+    this.orderCount = 0,
+    this.createdAt,
+  });
+
+  factory CustomerRow.fromJson(Map<String, dynamic> j) {
+    final orders = j['orders'];
+    final cnt = (orders is List && orders.isNotEmpty && orders.first is Map)
+        ? ((orders.first as Map)['count'] as num?)?.toInt() ?? 0
+        : 0;
+    return CustomerRow(
+      id: j['id'] as String,
+      name: j['name'] as String? ?? '',
+      phone: j['phone'] as String?,
+      contactChannel: j['contact_channel'] as String?,
+      address: j['address'] as String?,
+      sellerName: (j['profiles'] as Map?)?['full_name'] as String?,
+      orderCount: cnt,
+      createdAt: toDate(j['created_at']),
+    );
+  }
+}
+
 class ManagerRepository {
   final SupabaseClient _db;
   ManagerRepository(this._db);
@@ -82,6 +131,30 @@ class ManagerRepository {
     if (rows.isEmpty) {
       throw 'Không $what được (không có quyền hoặc dữ liệu không tồn tại).';
     }
+  }
+
+  // ---------------- Tổng quan ----------------
+
+  Future<Map<String, dynamic>> fetchDashboard() async {
+    final r = await _db.rpc('manager_dashboard');
+    return Map<String, dynamic>.from(r as Map);
+  }
+
+  // ---------------- Khách hàng ----------------
+
+  Future<List<CustomerRow>> fetchCustomers({
+    String? search,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    var q = _db.from('customers').select('*, profiles(full_name), orders(count)');
+    final t = _cleanSearch(search ?? '');
+    if (t.isNotEmpty) q = q.or('name.ilike.*$t*,phone.ilike.*$t*');
+    final data = await q
+        .order('created_at', ascending: false)
+        .order('id')
+        .range(offset, offset + limit - 1);
+    return data.map<CustomerRow>(CustomerRow.fromJson).toList();
   }
 
   // ---------------- UC13: sản phẩm ----------------
@@ -210,16 +283,25 @@ class ManagerRepository {
     ];
   }
 
+  /// Bỏ ký tự làm hỏng cú pháp bộ lọc `or=(...)` của PostgREST.
+  String _cleanSearch(String s) =>
+      s.trim().replaceAll(RegExp(r'[,()*%"\\]'), ' ').trim();
+
   Future<List<Order>> fetchOrders({
     PaymentStatus? payment,
     DeliveryStatus? delivery,
     String? sellerId,
+    String? customerId,
     DateTimeRange? range,
+    String? search, // mã đơn hoặc tên / SĐT khách
+    int offset = 0,
+    int limit = 30,
   }) async {
     var q = _db.from('orders').select(_orderSelect);
     if (payment != null) q = q.eq('payment_status', payment.value);
     if (delivery != null) q = q.eq('delivery_status', delivery.value);
     if (sellerId != null) q = q.eq('seller_id', sellerId);
+    if (customerId != null) q = q.eq('customer_id', customerId);
     if (range != null) {
       final start = DateTime(range.start.year, range.start.month, range.start.day);
       final end = DateTime(range.end.year, range.end.month, range.end.day)
@@ -228,7 +310,25 @@ class ManagerRepository {
           .gte('created_at', start.toUtc().toIso8601String())
           .lt('created_at', end.toUtc().toIso8601String());
     }
-    final data = await q.order('created_at', ascending: false);
+    final t = _cleanSearch(search ?? '');
+    if (t.isNotEmpty) {
+      // PostgREST không OR được giữa cột của bảng và cột của bảng nhúng,
+      // nên tìm khách trước rồi OR theo mã đơn / customer_id.
+      final cs = await _db
+          .from('customers')
+          .select('id')
+          .or('name.ilike.*$t*,phone.ilike.*$t*')
+          .limit(300);
+      final ids = [for (final c in cs) c['id'] as String];
+      q = q.or([
+        'code.ilike.*$t*',
+        if (ids.isNotEmpty) 'customer_id.in.(${ids.join(',')})',
+      ].join(','));
+    }
+    final data = await q
+        .order('created_at', ascending: false)
+        .order('id')
+        .range(offset, offset + limit - 1);
     return data.map<Order>(Order.fromJson).toList();
   }
 
@@ -254,14 +354,25 @@ class ManagerRepository {
 
   Future<List<SalesLedgerEntry>> fetchLedger(DateTimeRange range) async {
     final f = DateFormat('yyyy-MM-dd');
-    final data = await _db
-        .from('sales_ledger')
-        .select()
-        .gte('sale_date', f.format(range.start))
-        .lte('sale_date', f.format(range.end))
-        .order('sale_date', ascending: false)
-        .order('order_code', ascending: false);
-    return data.map<SalesLedgerEntry>(SalesLedgerEntry.fromJson).toList();
+    const page = 1000; // giới hạn mặc định của Supabase mỗi request
+    const maxRows = 20000; // chặn an toàn
+    final all = <SalesLedgerEntry>[];
+    var offset = 0;
+    while (offset < maxRows) {
+      final data = await _db
+          .from('sales_ledger')
+          .select()
+          .gte('sale_date', f.format(range.start))
+          .lte('sale_date', f.format(range.end))
+          .order('sale_date', ascending: false)
+          .order('order_code', ascending: false)
+          .order('line_id') // cột duy nhất -> phân trang không trùng / sót dòng
+          .range(offset, offset + page - 1);
+      all.addAll(data.map<SalesLedgerEntry>(SalesLedgerEntry.fromJson));
+      if (data.length < page) break;
+      offset += page;
+    }
+    return all;
   }
 
   // ---------------- UC17 / UC18: rút tiền ----------------
@@ -358,10 +469,33 @@ class ManagerRepository {
   Future<List<AccountRow>> fetchAccounts({UserRole? role}) async {
     var q = _db
         .from('profiles')
-        .select('id, full_name, phone, email, role, is_active');
+        .select('id, full_name, phone, email, role, is_active, wallet_balance');
     if (role != null) q = q.eq('role', role.name);
     final data = await q.order('created_at', ascending: false);
-    return data.map<AccountRow>(AccountRow.fromJson).toList();
+
+    // Tổng hoa hồng từng người bán (view seller_commission_summary).
+    // Nếu chưa chạy SQL mục 7 thì bỏ qua, danh sách vẫn hiện bình thường.
+    final sums = <String, ({double total, int orders})>{};
+    var loaded = false;
+    try {
+      final rows = await _db.from('seller_commission_summary').select();
+      for (final e in rows) {
+        sums[e['seller_id'] as String] = (
+          total: (e['total_commission'] as num?)?.toDouble() ?? 0,
+          orders: (e['commission_orders'] as num?)?.toInt() ?? 0,
+        );
+      }
+      loaded = true;
+    } catch (_) {}
+
+    return [
+      for (final e in data)
+        AccountRow.fromJson(
+          e,
+          commission: loaded ? (sums[e['id']]?.total ?? 0) : null,
+          commissionOrders: loaded ? (sums[e['id']]?.orders ?? 0) : null,
+        ),
+    ];
   }
 
   /// Thao tác cần service role -> gọi Edge Function `create-user`.

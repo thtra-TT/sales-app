@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../models/models.dart';
+import 'ledger_export.dart';
 import 'manager_common.dart';
 import 'manager_repository.dart';
 
@@ -14,24 +15,11 @@ class LedgerPage extends ConsumerStatefulWidget {
   ConsumerState<LedgerPage> createState() => _LedgerPageState();
 }
 
-class _Totals {
-  double gross = 0; // tổng tiền hàng (trước giảm giá)
-  final _orders = <String, ({double total, bool paid})>{};
-
-  void add(SalesLedgerEntry e) {
-    gross += e.lineTotal;
-    _orders[e.orderCode] = (total: e.orderTotal, paid: e.paymentStatus == PaymentStatus.paid);
-  }
-
-  int get orderCount => _orders.length;
-  double get net => _orders.values.fold(0, (s, o) => s + o.total);
-  double get paid =>
-      _orders.values.where((o) => o.paid).fold(0, (s, o) => s + o.total);
-}
-
 class _LedgerPageState extends ConsumerState<LedgerPage> {
   late DateTimeRange _range;
   late Future<List<SalesLedgerEntry>> _future;
+  List<SalesLedgerEntry> _rows = const []; // dữ liệu đang hiển thị, dùng để xuất file
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -76,7 +64,28 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
               tooltip: 'Tải lại',
               onPressed: _reload,
               icon: const Icon(Icons.refresh)),
-          const LogoutButton(),
+          if (_exporting)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                ),
+              ),
+            )
+          else
+            PopupMenuButton<bool>(
+              tooltip: 'Xuất file',
+              icon: const Icon(Icons.file_download_outlined),
+              onSelected: _export,
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: true, child: Text('Xuất Excel (.xlsx)')),
+                PopupMenuItem(value: false, child: Text('Xuất PDF')),
+              ],
+            ),
         ],
       ),
       body: Column(children: [
@@ -101,12 +110,32 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
     );
   }
 
+  Future<void> _export(bool excel) async {
+    if (_rows.isEmpty) {
+      return showSnack(context, 'Không có dữ liệu để xuất.', error: true);
+    }
+    setState(() => _exporting = true);
+    try {
+      if (excel) {
+        await exportLedgerExcel(_range, _rows);
+        if (mounted) showSnack(context, 'Đã xuất file Excel.');
+      } else {
+        await exportLedgerPdf(_range, _rows);
+      }
+    } catch (e) {
+      showSnack(context, 'Xuất file thất bại: ${errorText(e)}', error: true);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   Widget _buildList(List<SalesLedgerEntry> rows) {
+    _rows = rows;
     if (rows.isEmpty) {
       return const Center(child: Text('Không có dữ liệu trong khoảng ngày này.'));
     }
     final byDay = <DateTime, List<SalesLedgerEntry>>{};
-    final all = _Totals();
+    final all = LedgerTotals();
     for (final e in rows) {
       byDay.putIfAbsent(e.saleDate, () => []).add(e);
       all.add(e);
@@ -135,7 +164,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
         for (final entry in byDay.entries) ...[
           const SizedBox(height: 8),
           Builder(builder: (_) {
-            final t = _Totals();
+            final t = LedgerTotals();
             for (final e in entry.value) {
               t.add(e);
             }
@@ -187,7 +216,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
     );
   }
 
-  Widget _summary(String title, _Totals t, ThemeData theme, {Color? color}) =>
+  Widget _summary(String title, LedgerTotals t, ThemeData theme, {Color? color}) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('$title · ${t.orderCount} đơn',
             style: theme.textTheme.titleSmall

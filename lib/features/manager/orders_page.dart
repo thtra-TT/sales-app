@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,7 @@ import '../../models/models.dart';
 import 'manager_common.dart';
 import 'manager_repository.dart';
 import 'order_detail_page.dart';
+import 'paged_list.dart';
 
 class _Opt<T> {
   final T? value;
@@ -43,42 +46,55 @@ class _FilterMenu<T> extends StatelessWidget {
   }
 }
 
-/// UC14 – Xem toàn bộ đơn và lọc.
+/// UC14 – Xem toàn bộ đơn: tìm kiếm, lọc, phân trang.
 class OrdersPage extends ConsumerStatefulWidget {
-  const OrdersPage({super.key});
+  /// Bộ lọc ban đầu (khi mở từ thẻ trên màn Tổng quan).
+  final PaymentStatus? initialPayment;
+  final DeliveryStatus? initialDelivery;
+  const OrdersPage({super.key, this.initialPayment, this.initialDelivery});
 
   @override
   ConsumerState<OrdersPage> createState() => _OrdersPageState();
 }
 
 class _OrdersPageState extends ConsumerState<OrdersPage> {
-  PaymentStatus? _payment;
-  DeliveryStatus? _delivery;
+  late PaymentStatus? _payment = widget.initialPayment;
+  late DeliveryStatus? _delivery = widget.initialDelivery;
   String? _sellerId;
   DateTimeRange? _range;
+  String _query = '';
+  int _tick = 0; // đổi để PagedList tải lại từ đầu
 
+  final _search = TextEditingController();
+  Timer? _debounce;
   List<({String id, String name})> _sellers = [];
-  late Future<List<Order>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
     ref.read(managerRepositoryProvider).fetchSellers().then((s) {
       if (mounted) setState(() => _sellers = s);
     }).catchError((_) {});
   }
 
-  Future<List<Order>> _load() => ref.read(managerRepositoryProvider).fetchOrders(
-        payment: _payment,
-        delivery: _delivery,
-        sellerId: _sellerId,
-        range: _range,
-      );
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
 
-  void _reload() {
+  void _refilter(VoidCallback change) {
     setState(() {
-      _future = _load();
+      change();
+      _tick++;
+    });
+  }
+
+  void _onSearchChanged(String text) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 450), () {
+      if (mounted && text.trim() != _query) _refilter(() => _query = text.trim());
     });
   }
 
@@ -90,10 +106,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
       lastDate: DateTime(now.year + 1),
       initialDateRange: _range,
     );
-    if (r != null) {
-      _range = r;
-      _reload();
-    }
+    if (r != null) _refilter(() => _range = r);
   }
 
   @override
@@ -103,14 +116,41 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           actions: [
             IconButton(
                 tooltip: 'Tải lại',
-                onPressed: _reload,
+                onPressed: () => _refilter(() {}),
                 icon: const Icon(Icons.refresh)),
             const LogoutButton(),
           ],
         ),
         body: Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: TextField(
+              controller: _search,
+              onChanged: _onSearchChanged,
+              onSubmitted: (t) {
+                _debounce?.cancel();
+                if (t.trim() != _query) _refilter(() => _query = t.trim());
+              },
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Tìm theo mã đơn, tên hoặc SĐT khách',
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _search.clear();
+                          _debounce?.cancel();
+                          _refilter(() => _query = '');
+                        },
+                      ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Wrap(spacing: 8, runSpacing: 0, children: [
@@ -121,10 +161,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     const _Opt(null, 'Tất cả'),
                     for (final s in PaymentStatus.values) _Opt(s, s.label),
                   ],
-                  onChanged: (v) {
-                    _payment = v;
-                    _reload();
-                  },
+                  onChanged: (v) => _refilter(() => _payment = v),
                 ),
                 _FilterMenu<DeliveryStatus>(
                   title: 'Giao hàng',
@@ -133,10 +170,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     const _Opt(null, 'Tất cả'),
                     for (final s in DeliveryStatus.values) _Opt(s, s.label),
                   ],
-                  onChanged: (v) {
-                    _delivery = v;
-                    _reload();
-                  },
+                  onChanged: (v) => _refilter(() => _delivery = v),
                 ),
                 _FilterMenu<String>(
                   title: 'Người bán',
@@ -145,10 +179,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     const _Opt(null, 'Tất cả'),
                     for (final s in _sellers) _Opt(s.id, s.name),
                   ],
-                  onChanged: (v) {
-                    _sellerId = v;
-                    _reload();
-                  },
+                  onChanged: (v) => _refilter(() => _sellerId = v),
                 ),
                 ActionChip(
                   avatar: const Icon(Icons.date_range, size: 16),
@@ -160,45 +191,40 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 if (_range != null)
                   ActionChip(
                     label: const Text('Xoá lọc ngày'),
-                    onPressed: () {
-                      _range = null;
-                      _reload();
-                    },
+                    onPressed: () => _refilter(() => _range = null),
                   ),
               ]),
             ),
           ),
           Expanded(
-            child: FutureBody<List<Order>>(
-              future: _future,
-              onRetry: _reload,
-              builder: (orders) {
-                if (orders.isEmpty) {
-                  return const Center(
-                      child: Text('Không có đơn nào khớp bộ lọc.'));
-                }
-                return RefreshIndicator(
-                  onRefresh: () async => _reload(),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: orders.length,
-                    itemBuilder: (_, i) => _OrderTile(
-                      order: orders[i],
-                      onChanged: _reload,
-                    ),
-                  ),
-                );
-              },
+            child: PagedList<Order>(
+              key: ValueKey(
+                  '$_tick|$_payment|$_delivery|$_sellerId|$_range|$_query'),
+              emptyText: 'Không có đơn nào khớp.',
+              fetch: (offset, limit) =>
+                  ref.read(managerRepositoryProvider).fetchOrders(
+                        payment: _payment,
+                        delivery: _delivery,
+                        sellerId: _sellerId,
+                        range: _range,
+                        search: _query,
+                        offset: offset,
+                        limit: limit,
+                      ),
+              itemBuilder: (_, o) => OrderTile(
+                order: o,
+                onChanged: () => _refilter(() {}),
+              ),
             ),
           ),
         ]),
       );
 }
 
-class _OrderTile extends StatelessWidget {
+class OrderTile extends StatelessWidget {
   final Order order;
   final VoidCallback onChanged;
-  const _OrderTile({required this.order, required this.onChanged});
+  const OrderTile({super.key, required this.order, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
