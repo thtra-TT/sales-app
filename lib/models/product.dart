@@ -38,6 +38,7 @@ class Product {
   static Map<String, dynamic> toInsertJson({
     required String name,
     String? description,
+    String? imageUrl,
   }) =>
-      {'name': name, 'description': description};
+      {'name': name, 'description': description, 'image_url': imageUrl};
 }

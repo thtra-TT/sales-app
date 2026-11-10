@@ -31,6 +31,12 @@ class ProductItem {
     required String productId,
     required String name,
     required double price,
+    String? imageUrl,
   }) =>
-      {'product_id': productId, 'name': name, 'price': price};
+      {
+        'product_id': productId,
+        'name': name,
+        'price': price,
+        'image_url': imageUrl,
+      };
 }

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Màu thương hiệu kiểu Lazada: cam + nền xám nhạt + thẻ trắng.
-const kBrand = Color(0xFFF57224);
-const kBrandDark = Color(0xFFE5471F);
-const kPriceColor = Color(0xFFF57224);
+/// Màu cam thương hiệu (kiểu Shopee). Muốn đổi màu app chỉ cần sửa các dòng này.
+const kBrand = Color(0xFFEE4D2D);
+const kBrandDark = Color(0xFFD73211);
+const kBrandSoft = Color(0xFFFFE9E3); // nền nhạt cho chip/được chọn
+const kPriceColor = kBrand;
 const kPageBg = Color(0xFFF5F5F5);
 
 ThemeData buildLightTheme() {
@@ -13,12 +14,12 @@ ThemeData buildLightTheme() {
   ).copyWith(
     primary: kBrand,
     onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFFFE8D9),
-    onPrimaryContainer: const Color(0xFF5C2200),
+    primaryContainer: kBrandSoft,
+    onPrimaryContainer: const Color(0xFF8A1F00),
     surface: Colors.white,
   );
 
-  final radius = BorderRadius.circular(10);
+  final radius = BorderRadius.circular(12);
 
   return ThemeData(
     useMaterial3: true,
@@ -26,23 +27,25 @@ ThemeData buildLightTheme() {
     colorScheme: scheme,
     scaffoldBackgroundColor: kPageBg,
     appBarTheme: const AppBarTheme(
-      backgroundColor: kBrand,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.white,
+      foregroundColor: Color(0xFF222222),
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
-      scrolledUnderElevation: 0,
+      scrolledUnderElevation: 0.5,
       centerTitle: false,
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: Color(0xFF222222),
         fontSize: 18,
         fontWeight: FontWeight.w700,
       ),
     ),
     cardTheme: CardThemeData(
       color: Colors.white,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 5),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         side: const BorderSide(color: Color(0xFFEDEDED)),
       ),
     ),
@@ -52,14 +55,14 @@ ThemeData buildLightTheme() {
     dividerTheme: const DividerThemeData(color: Color(0xFFEEEEEE), space: 16),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: const Color(0xFFF2F2F2),
       border: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
@@ -70,7 +73,8 @@ ThemeData buildLightTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: kBrand,
         foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(48),
+        // Không dùng Size.fromHeight: width vô hạn sẽ lỗi trong Row/AlertDialog.
+        minimumSize: const Size(64, 48),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
         shape: RoundedRectangleBorder(borderRadius: radius),
       ),
@@ -91,13 +95,13 @@ ThemeData buildLightTheme() {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: Colors.white,
-      selectedColor: const Color(0xFFFFE8D9),
+      selectedColor: kBrandSoft,
       side: const BorderSide(color: Color(0xFFE0E0E0)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: Colors.white,
-      indicatorColor: const Color(0xFFFFE8D9),
+      indicatorColor: kBrandSoft,
       surfaceTintColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
@@ -118,7 +122,7 @@ ThemeData buildLightTheme() {
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: const Color(0xFFFFE8D9),
+        selectedBackgroundColor: kBrandSoft,
         selectedForegroundColor: kBrandDark,
       ),
     ),
