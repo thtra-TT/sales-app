@@ -176,6 +176,13 @@ class _CreateOrderPageState extends ConsumerState<CreateOrderPage> {
 
   // ---------- Các khối giao diện ----------
 
+  /// Khối trắng phẳng. Dùng Material (không dùng Container có màu) để hiệu ứng
+  /// bấm của ListTile / InkWell bên trong hiển thị đúng và không báo lỗi.
+  Widget _block(ColorScheme cs, Widget child) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(color: cs.surface, child: child),
+      );
+
   Widget _customerBlock(ColorScheme cs) {
     final c = _customer;
     final detail = c == null
@@ -184,10 +191,7 @@ class _CreateOrderPageState extends ConsumerState<CreateOrderPage> {
             .whereType<String>()
             .where((s) => s.isNotEmpty)
             .join(' · ');
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: cs.surface,
-      child: InkWell(
+    return _block(cs, InkWell(
         onTap: _pickCustomer,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
@@ -275,10 +279,7 @@ class _CreateOrderPageState extends ConsumerState<CreateOrderPage> {
         ),
       );
 
-  Widget _groupBlock(_Group g, ColorScheme cs) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        color: cs.surface,
-        child: Column(
+  Widget _groupBlock(_Group g, ColorScheme cs) => _block(cs, Column(
           children: [
             // Tiêu đề sản phẩm (giống tên shop trong giỏ hàng)
             Padding(
@@ -406,10 +407,7 @@ class _CreateOrderPageState extends ConsumerState<CreateOrderPage> {
         ),
       );
 
-  Widget _addMoreButton(ColorScheme cs) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        color: cs.surface,
-        child: InkWell(
+  Widget _addMoreButton(ColorScheme cs) => _block(cs, InkWell(
           onTap: _addProduct,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -431,10 +429,7 @@ class _CreateOrderPageState extends ConsumerState<CreateOrderPage> {
         ),
       );
 
-  Widget _invoiceBlock(ColorScheme cs) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        color: cs.surface,
-        child: Column(
+  Widget _invoiceBlock(ColorScheme cs) => _block(cs, Column(
           children: [
             SwitchListTile(
               secondary: Icon(Icons.receipt_long_outlined, color: cs.primary),
