@@ -8,6 +8,7 @@ class ProductionTask {
   final String orderCode;
   final String productName;
   final String itemName;
+  final String? imageUrl;
   final int quantity;
   final ProductionStatus productionStatus;
   final DateTime? paidAt;
@@ -19,6 +20,7 @@ class ProductionTask {
     required this.itemName,
     required this.quantity,
     required this.productionStatus,
+    this.imageUrl,
     this.paidAt,
   });
 
@@ -27,6 +29,7 @@ class ProductionTask {
         orderCode: j['order_code'] as String? ?? '',
         productName: j['product_name'] as String? ?? '',
         itemName: j['item_name'] as String? ?? '',
+        imageUrl: j['image_url'] as String?,
         quantity: j['quantity'] as int,
         productionStatus:
             ProductionStatus.fromString(j['production_status'] as String?),

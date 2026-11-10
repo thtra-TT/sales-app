@@ -8,6 +8,7 @@ class OrderItem {
   final String productName; // snapshot lúc tạo đơn
   final String itemName; // snapshot lúc tạo đơn
   final double unitPrice; // snapshot lúc tạo đơn
+  final String? imageUrl; // snapshot lúc tạo đơn
   final int quantity;
   final double lineTotal;
   final ProductionStatus productionStatus;
@@ -22,6 +23,7 @@ class OrderItem {
     required this.quantity,
     required this.lineTotal,
     required this.productionStatus,
+    this.imageUrl,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
@@ -31,13 +33,14 @@ class OrderItem {
         productName: j['product_name'] as String? ?? '',
         itemName: j['item_name'] as String? ?? '',
         unitPrice: toDouble(j['unit_price']),
+        imageUrl: j['image_url'] as String?,
         quantity: j['quantity'] as int,
         lineTotal: toDouble(j['line_total']),
         productionStatus:
             ProductionStatus.fromString(j['production_status'] as String?),
       );
 
-  /// Giá và tên do trigger ở DB tự điền, client chỉ gửi item + số lượng.
+  /// Giá, tên, ảnh do trigger ở DB tự điền, client chỉ gửi item + số lượng.
   static Map<String, dynamic> toInsertJson({
     required String orderId,
     required String productItemId,

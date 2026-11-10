@@ -42,6 +42,30 @@ class _ProductionHomeState extends ConsumerState<ProductionHome> {
   }
 
   Future<void> _changeStatus(ProductionTask t, ProductionStatus s) async {
+    // Hoàn thành là bước cuối, không quay lại được -> hỏi xác nhận
+    if (s == ProductionStatus.done) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Hoàn thành sản phẩm này?'),
+          content: Text(
+            '${t.productName} - ${t.itemName} (× ${t.quantity})\n'
+            'Sau khi hoàn thành sẽ không thể quay lại trạng thái trước.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Hoàn thành'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     setState(() => _updating.add(t.id));
     try {
       await ref

@@ -5,6 +5,7 @@ import '../../../core/format.dart';
 import '../../../models/models.dart';
 import '../data/seller_providers.dart';
 import '../widgets/paged_search_list.dart';
+import '../widgets/product_image.dart';
 import '../widgets/status_chip.dart';
 import 'order_detail_page.dart';
 
@@ -86,56 +87,107 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final o = order;
+
     final names = <String>[];
     for (final i in o.items) {
       if (!names.contains(i.productName)) names.add(i.productName);
     }
     final productName = names.isEmpty
-        ? ''
+        ? 'Đơn hàng'
         : names.length == 1
             ? names.first
             : '${names.first} +${names.length - 1} sản phẩm';
+    final image = o.items.isEmpty ? null : o.items.first.imageUrl;
+
     return Card(
       margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Mã đơn + trạng thái
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       o.code,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                  Text(
-                    formatMoney(o.total),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  paymentChip(o.paymentStatus),
+                  if (o.isPaid) ...[
+                    const SizedBox(width: 6),
+                    deliveryChip(o.deliveryStatus),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Ảnh + tên sản phẩm + khách hàng
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProductImage(url: image, size: 72),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          productName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${o.customer?.name ?? 'Khách hàng'} · ${o.items.length} mục',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          formatDateTime(o.createdAt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${o.customer?.name ?? 'Khách hàng'}'
-                '${productName.isEmpty ? '' : ' · $productName'}'
-                ' · ${o.items.length} mục',
-              ),
-              const SizedBox(height: 2),
-              Text(
-                formatDateTime(o.createdAt),
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
+              const Divider(height: 20),
+
+              // Thành tiền
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  paymentChip(o.paymentStatus),
-                  if (o.isPaid) deliveryChip(o.deliveryStatus),
+                  Text(
+                    'Thành tiền: ',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                  ),
+                  Text(
+                    formatMoney(o.total),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
                 ],
               ),
             ],
