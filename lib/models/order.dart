@@ -20,6 +20,7 @@ class Order {
   final double? commissionPercent; // chốt lúc chuyển đã thanh toán
   final double? commissionAmount;
   final DeliveryStatus deliveryStatus;
+  final DateTime? deliveryUpdatedAt; // cột tuỳ chọn, xem manager_migration.sql
   final DateTime? createdAt;
 
   // Có giá trị khi select kèm quan hệ:
@@ -45,6 +46,7 @@ class Order {
     this.paidAt,
     this.commissionPercent,
     this.commissionAmount,
+    this.deliveryUpdatedAt,
     this.createdAt,
     this.customer,
     this.items = const [],
@@ -73,6 +75,7 @@ class Order {
       commissionPercent: toDoubleOrNull(j['commission_percent']),
       commissionAmount: toDoubleOrNull(j['commission_amount']),
       deliveryStatus: DeliveryStatus.fromString(j['delivery_status'] as String?),
+      deliveryUpdatedAt: toDate(j['delivery_updated_at']),
       createdAt: toDate(j['created_at']),
       customer: cust == null ? null : Customer.fromJson(cust),
       items: ((j['order_items'] as List?) ?? const [])

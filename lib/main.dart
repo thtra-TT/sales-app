@@ -26,8 +26,8 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Quản lý bán hàng',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: buildDarkTheme(),
+      themeMode: ThemeMode.light,
+      theme: buildLightTheme(),
       routerConfig: router,
     );
   }
